@@ -1,10 +1,14 @@
+use std::vec;
+
 use grid::Error;
 
 pub struct GridInfo
 {
     pub start_pos : (usize, usize),
+    pub exit_pos : (usize, usize),
     pub row_max : usize,
     pub column_max : usize,
+    pub grid : Vec<Vec<char>>,
 }
 mod grid
 {
@@ -20,14 +24,15 @@ mod grid
         MisingExit,
         TooManyExit,
         IncoherenceGridSize, 
-        UnothorizedValue
+        UnothorizedValue,
+        StartPosOnBlockedCase
     }
 }
 impl GridInfo
 {
-    const CASE_OPEN: char = 'O';
-    const CASE_CLOSE: char = 'E';
-    const CASE_WIN: char = 'X';
+    pub const CASE_OPEN: char = 'O';
+    pub const CASE_CLOSE: char = 'E';
+    pub const CASE_WIN: char = 'X';
 
     fn check_integrity(grid_row : &String) -> Result<(), Error>
     {
@@ -67,7 +72,7 @@ impl GridInfo
         Ok(())
     }
 
-    fn check_logic(&self, lines : &mut std::str::Lines) -> Result<(), Error> 
+    fn check_logic(&self, lines : std::str::Lines) -> Result<(), Error> 
     {
        if self.start_pos.0 > self.row_max
         {
@@ -78,14 +83,27 @@ impl GridInfo
             return Err(Error::IncoherenceBetweenStartPosAndMaxBound);
         }
         let mut row : usize = 0;
-        let mut nbExit = 0;
+        let mut column : usize = 0;
+        let mut nb_exit = 0;
         for line in lines
         {
-            if line.chars().any(|c| c != GridInfo::CASE_WIN && c != GridInfo::CASE_OPEN && c != GridInfo::CASE_CLOSE)
+            column = 0;
+            for c in line.chars()
             {
-                return Err(Error::UnothorizedValue);
+                /*if (row,column) == self.start_pos
+                {
+                    if c != GridInfo::CASE_OPEN
+                    {
+                        return Err(Error::StartPosOnBlockedCase);
+                    }
+                }*/
+                if c != GridInfo::CASE_WIN && c != GridInfo::CASE_OPEN && c != GridInfo::CASE_CLOSE
+                {
+                    return Err(Error::UnothorizedValue);
+                }
+                column += 1;
             }
-            nbExit += line.chars().filter(|&c| c == GridInfo::CASE_WIN).count();
+            nb_exit += line.chars().filter(|&c| c == GridInfo::CASE_WIN).count();
             if (line.len() -1) != self.column_max // start by 0 even in the grid file
             {
                 return Err(Error::IncoherenceGridSize)
@@ -96,23 +114,46 @@ impl GridInfo
         {
             return Err(Error::IncoherenceGridSize);
         }
-        if nbExit == 0
+        if nb_exit == 0
         {
             return Err(Error::MisingExit);
         }
-        else if nbExit > 1
+        else if nb_exit > 1
         {
             return Err(Error::TooManyExit);
         }
         Ok(())
     }
 
-    pub fn new(grid_row : &String) -> Result<(GridInfo), Error>
+    fn fill_grid(&mut self, grid_lines : &mut std::str::Lines)
+    {
+        self.grid.clear();
+        let mut current_pos = (self.row_max, 0);
+        for line in grid_lines {
+            let mut grid_line: Vec<char> = vec![];
+            for case in line.chars() {
+                grid_line.push(case);
+                if case == GridInfo::CASE_WIN {
+                    self.exit_pos = current_pos;
+                }
+                current_pos.1 += 1;
+            }
+            if current_pos.0 > 0 { // TO DO
+            current_pos.0 -= 1;
+            }
+            current_pos.1 = 0;
+            self.grid.insert(0, grid_line);
+        }
+    }
+
+    pub fn new(grid_row : &String) -> Result<GridInfo, Error>
     {
         let mut grid_info = GridInfo {
             start_pos: (usize::MAX, usize::MAX),
+            exit_pos: (usize::MAX, usize::MAX),
             row_max: usize::MAX,
             column_max: usize::MAX,
+            grid: vec![vec![]]
         };
 
         GridInfo::check_integrity(grid_row)?;
@@ -141,8 +182,8 @@ impl GridInfo
             } 
         }
 
-        grid_info.check_logic(&mut grid_lines)?;
-
+        grid_info.check_logic(grid_lines.clone())?;
+        grid_info.fill_grid(&mut grid_lines);
         Ok(grid_info)
     }
 
@@ -158,9 +199,25 @@ mod tests {
             assert_eq!(2, grid_info.row_max);
             assert_eq!(6, grid_info.column_max);
             assert_eq!((0,2), grid_info.start_pos);
+            assert_eq!((2,1), grid_info.exit_pos);
+            let grid_mocked: Vec<Vec<char>> = [ ['E', 'O', 'O', 'E', 'E', 'E', 'E'].to_vec(), 
+            ['O', 'O', 'O', 'O', 'O', 'E', 'E'].to_vec(),
+            ['O', 'X', 'O', 'E', 'E', 'E', 'E'].to_vec()].to_vec();            
+            assert_eq!(grid_mocked, grid_info.grid);
         }
         else {
             panic!("Expected OK, but got an Error");
+        }
+    }
+    #[test]
+    fn test_should_return_error_for_start_position_if_start_sport_start_on_wrong_case() {
+        let test_input_grid_row = &String::from("2 6\n0 2\nEXEEEEE\nOOOOOEE\nEOOEEEE");
+        if let Err(grid_error) = GridInfo::new(test_input_grid_row)
+        {
+            assert_eq!(Error::StartPosOnBlockedCase, grid_error);
+        }
+        else {
+            panic!("Expected an error, but got Ok");
         }
     }
     #[test]
