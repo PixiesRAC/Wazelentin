@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         Ok(grid_info) =>
         {
-            let wazelentin = PathDetective{grid_info : grid_info};
+            let wazelentin = PathDetective{grid_info};
             wazelentin.find_shortest_path();
         }
         Err(err) =>

@@ -2,8 +2,6 @@ use crate::GridInfo;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
-use std::time::Duration;
-use std::{thread, vec};
 pub struct PathDetective {
     pub grid_info: GridInfo,
 }
@@ -73,46 +71,42 @@ impl PathDetective {
     }
 
     fn fill_intersection_distance(&self, graph_cases: &HashMap<(usize, usize), Rc<RefCell<GraphInfo>>>) {
-        if let Some(_) = graph_cases.get(&self.grid_info.start_pos) {
+        if graph_cases.get(&self.grid_info.start_pos).is_some() {
             let mut visited_positions: HashSet<(usize, usize)> = HashSet::new();
             let mut queue: VecDeque<((usize, usize), usize)> = VecDeque::new();
 
             queue.push_back((self.grid_info.start_pos, 0));
 
             while let Some((current_pos, distance)) = queue.pop_front() {
-                println!("POPPING {:?}", current_pos);
-                // Marquez la position actuelle comme visitée
+                //println!("POPPING {:?}", current_pos);
                 visited_positions.insert(current_pos);
 
-                // Accédez aux informations pour la position actuelle
                 let rc_current_info = graph_cases
                     .get(&current_pos)
                     .expect("Position not found in graph_cases");
                 let mut current_info = rc_current_info.borrow_mut();
                 current_info.distance_from_start = distance;
 
-                println!(
+                /*println!(
                     "Current pos : {:?} | associated {:?} | dist {:?}",
                     current_pos, current_info.connected_case, distance
-                );
-                // Vérifiez si la valeur cible existe dans la connected_case
+                );*/
                 if current_info
                     .connected_case
                     .contains(&self.grid_info.exit_pos)
                 {
-                    println!(
+                    /*println!(
                         "Found target value {:?} in connected_case for position {:?}",
                         &self.grid_info.exit_pos, current_pos
-                    );
+                    );*/
                     break;
                 }
 
-                // Ajoutez les positions connectées non visitées à la pile
                 for &connected_pos in &current_info.connected_case {
                     if !visited_positions.contains(&connected_pos) {
                         let contains_value = queue
                             .iter()
-                            .any(|((first_value), _)| first_value == &connected_pos);
+                            .any(|(first_value, _)| first_value == &connected_pos);
                         if !contains_value {
                             queue.push_back((connected_pos, distance + 1));
                         }
@@ -129,7 +123,7 @@ impl PathDetective {
         graph: &HashMap<(usize, usize), Rc<RefCell<GraphInfo>>>,
         visited: &mut HashSet<(usize, usize)>,
         pos: &(usize, usize),
-    ) {
+        shortest_path: &mut Vec<(usize, usize)>) {
         if pos != &self.grid_info.start_pos {
             let rc_graph_info = graph.get(pos).expect("Position not found in graph_cases");
             let graph_info = rc_graph_info.borrow();
@@ -150,25 +144,29 @@ impl PathDetective {
                     }
                 }
             }
-            println!("Jumping to case [{:?}]", next_case_to_check);
-            self.find_best_intersection(&graph.clone(), visited, &next_case_to_check.0);
+            shortest_path.insert(0, next_case_to_check.0);
+            self.find_best_intersection(&graph.clone(), visited, &next_case_to_check.0, shortest_path);
         }
     }
 
-    pub fn find_shortest_path(&self) {
+    pub fn find_shortest_path(&self) -> Vec<(usize, usize)> {
+        let mut shortest_path = Vec::new();
         let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
         self.fill_graph(&mut graph_cases);
         let mut visited: std::collections::HashSet<(usize, usize)> =
             std::collections::HashSet::new();
-        self.find_best_intersection(&graph_cases.clone(), &mut visited, &self.grid_info.exit_pos);
+        shortest_path.push(self.grid_info.exit_pos);
+        self.find_best_intersection(&graph_cases.clone(), &mut visited, &self.grid_info.exit_pos, &mut shortest_path);
+        println!("Shortest path {:?}", shortest_path);
+        shortest_path
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // #[test]
-    fn test_connected_case_for_second_case() {
+    #[test]
+    fn test_pos_for_second_case_on_first_row() {
         let grid_info = GridInfo {
             start_pos: (0, 2),
             exit_pos: (usize::MAX, usize::MAX),
@@ -177,46 +175,64 @@ mod tests {
             grid: [
                 ['E', 'O', 'O', 'E', 'E', 'E', 'E'].to_vec(),
                 ['O', 'O', 'O', 'O', 'O', 'E', 'E'].to_vec(),
-                ['O', 'X', 'O', 'E', 'E', 'E', 'E'].to_vec(),
+                ['O', 'O', 'O', 'E', 'E', 'E', 'E'].to_vec(),
             ]
             .to_vec(),
         };
         let wazelentin = PathDetective {
-            grid_info: grid_info,
+            grid_info: grid_info
         };
-        let mut graph_cases: Vec<GraphInfo> = Vec::new();
-        //wazelentin.fill_graph(&mut graph_cases);
-        //assert_eq!(graph_cases[1].pos, (0,2));
-        //assert_eq!(graph_cases[1].connected_case, [(1,3), (1,2), (1,1), (0,1)])
-    }
-    // #[test]
-    fn test_distance_form_start() {
-        let grid_info = GridInfo {
+        let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
+
+        wazelentin.fill_graph(&mut graph_cases);
+        assert_eq!(graph_cases.get(&(0, 2)).unwrap().borrow().pos, (0, 2));
+}
+    #[test]
+    fn test_connected_case() {
+        let mut grid_info = GridInfo {
             start_pos: (0, 2),
             exit_pos: (usize::MAX, usize::MAX),
             row_max: 2,
             column_max: 6,
             grid: [
-                ['O', 'O', 'O', 'O', 'E', 'E', 'E'].to_vec(),
-                ['O', 'O', 'O', 'O', 'X', 'E', 'E'].to_vec(),
-                ['O', 'O', 'O', 'O', 'E', 'E', 'E'].to_vec(),
+                ['E', 'O', 'O', 'E', 'E', 'E', 'E'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'E', 'E'].to_vec(),
+                ['O', 'O', 'O', 'E', 'E', 'E', 'E'].to_vec(),
             ]
             .to_vec(),
         };
+        grid_info.grid.reverse();
         let wazelentin = PathDetective {
-            grid_info: grid_info,
+            grid_info: grid_info
         };
-        let mut graph_cases: std::collections::HashMap<(usize, usize), GraphInfo> =
-            std::collections::HashMap::new();
+        let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
+
         wazelentin.fill_graph(&mut graph_cases);
-        assert_eq!(graph_cases[&(0, 2)].pos, (0, 2));
-        assert_eq!(graph_cases[&(0, 2)].distance_from_start, 0);
-        assert_eq!(graph_cases[&(0, 1)].pos, (0, 1));
-        assert_eq!(graph_cases[&(0, 1)].distance_from_start, 1);
-        assert_eq!(graph_cases[&(1, 2)].pos, (1, 2));
-        assert_eq!(graph_cases[&(1, 2)].distance_from_start, 1);
-        assert_eq!(graph_cases[&(2, 3)].pos, (2, 3));
-        assert_eq!(graph_cases[&(2, 3)].distance_from_start, 2);
-        //assert_eq!(graph_cases[1].connected_case, [(1,3), (1,2), (1,1), (0,1)])
+        assert_eq!(graph_cases.get(&(0, 0)).unwrap().borrow().connected_case, [(0, 1), (1, 1), (1, 0)]);
+        assert_eq!(graph_cases.get(&(1, 4)).unwrap().borrow().connected_case, [(1, 3)]);
+    }
+
+    #[test]
+    fn test_find_best_path() {
+        let mut grid_info = GridInfo {
+            start_pos: (2, 6),
+            exit_pos: (0, 0),
+            row_max: 5,
+            column_max: 6,
+            grid: [
+                ['E', 'O', 'E', 'O', 'E', 'O', 'E'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'O', 'O'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'E', 'O'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'E', 'O'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'E', 'E'].to_vec(),
+                ['X', 'O', 'O', 'E', 'E', 'O', 'O'].to_vec(),
+            ]
+            .to_vec(),
+        };
+        grid_info.grid.reverse();
+        let wazelentin = PathDetective {
+            grid_info: grid_info
+        };
+        assert_eq!(wazelentin.find_shortest_path(), [(2, 6), (3, 6), (4, 5), (3, 4), (2, 3), (1, 2), (1, 1), (0, 0)]);
     }
 }
