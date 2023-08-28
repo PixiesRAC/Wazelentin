@@ -2,8 +2,11 @@ use crate::GridInfo;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
+use std::sync::mpsc;
+
 pub struct PathDetective {
     pub grid_info: GridInfo,
+    pub sender : mpsc::Sender<(usize, usize)>
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +106,7 @@ impl PathDetective {
                 }
 
                 for &connected_pos in &current_info.connected_case {
+                    //println!("{:?}", connected_pos);
                     if !visited_positions.contains(&connected_pos) {
                         let contains_value = queue
                             .iter()
@@ -118,6 +122,7 @@ impl PathDetective {
         }
     }
 
+    #[allow(unused_must_use)]
     fn find_best_intersection(
         &self,
         graph: &HashMap<(usize, usize), Rc<RefCell<GraphInfo>>>,
@@ -125,6 +130,7 @@ impl PathDetective {
         pos: &(usize, usize),
         shortest_path: &mut Vec<(usize, usize)>) {
         if pos != &self.grid_info.start_pos {
+            //println!("{:?}", pos);
             let rc_graph_info = graph.get(pos).expect("Position not found in graph_cases");
             let graph_info = rc_graph_info.borrow();
 
@@ -144,12 +150,14 @@ impl PathDetective {
                     }
                 }
             }
+            self.sender.send(next_case_to_check.0.clone()).unwrap();
+            //print!("{:?}", next_case_to_check.0);
             shortest_path.insert(0, next_case_to_check.0);
             self.find_best_intersection(&graph.clone(), visited, &next_case_to_check.0, shortest_path);
         }
     }
 
-    pub fn find_shortest_path(&self) -> Vec<(usize, usize)> {
+    pub fn find_and_transmit_shortest_path(&self) -> Vec<(usize, usize)> {
         let mut shortest_path = Vec::new();
         let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
         self.fill_graph(&mut graph_cases);
@@ -157,7 +165,6 @@ impl PathDetective {
             std::collections::HashSet::new();
         shortest_path.push(self.grid_info.exit_pos);
         self.find_best_intersection(&graph_cases.clone(), &mut visited, &self.grid_info.exit_pos, &mut shortest_path);
-        println!("Shortest path {:?}", shortest_path);
         shortest_path
     }
 }

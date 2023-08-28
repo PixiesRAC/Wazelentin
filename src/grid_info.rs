@@ -2,6 +2,7 @@ use std::vec;
 
 use grid::Error;
 
+#[derive(Clone)]
 pub struct GridInfo {
     pub start_pos: (usize, usize),
     pub exit_pos: (usize, usize),
@@ -29,15 +30,8 @@ impl GridInfo {
     pub const CASE_CLOSE: char = 'E';
     pub const CASE_WIN: char = 'X';
 
-    // the goal here is to seperate the error logic and the functionnal logic
-    // I don't want to have these both logic inside one function
-    // When i am on the 'new' function or anything others 'functionnal' function i want to have peace of mind 
-    // More than that it's realy helpfull when you have to focus something which is only functionnal, the risk of doing some bugs is reduce seeing that the code is separated
-    // The hard thing here is to be capable of reducing the amount of duplicate code (TODO)
-    
-    fn check_integrity(grid_row : &String) -> Result<(), Error>
-    {
-      let mut grid_lines = grid_row.lines();
+    fn check_integrity(grid_row: &str) -> Result<(), Error> {
+        let mut grid_lines = grid_row.lines();
         if let Some(row_and_column_max_line) = grid_lines.next() {
             let field_iterator: Vec<_> = row_and_column_max_line.split(' ').collect();
             if field_iterator.len() == 2 {
@@ -78,9 +72,9 @@ impl GridInfo {
         for line in lines {
             column = 0;
             for c in line.chars() {
-                if (row, column) == self.start_pos && c != GridInfo::CASE_OPEN {
-                        return Err(Error::StartPosOnBlockedCase);
-                    }
+               // if (row, column) == self.start_pos && c != GridInfo::CASE_OPEN {
+               //         return Err(Error::StartPosOnBlockedCase);
+               //     }
                 if c != GridInfo::CASE_WIN && c != GridInfo::CASE_OPEN && c != GridInfo::CASE_CLOSE
                 {
                     return Err(Error::UnothorizedValue);
