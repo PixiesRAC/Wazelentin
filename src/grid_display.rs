@@ -1,32 +1,34 @@
 use crate::GridInfo;
-use std::time::Duration;
+use std::io::Write;
 use std::sync::mpsc;
-use termion::{color, cursor, style, clear};
-use std::io::{self, Write};
-
+use std::time::Duration;
+use termion::{clear, color, cursor};
 
 pub struct DisplayGrid {
     pub grid_info: GridInfo,
-    pub receiver : mpsc::Receiver<(usize, usize)>
+    pub receiver: Option<mpsc::Receiver<(usize, usize)>>,
 }
 impl DisplayGrid {
     pub fn display_grid(&self) {
-
-            print!("{}", clear::All);
-            let mut  x = 1;
-            let mut  y = 1;
-            for lines in self.grid_info.grid.iter().rev() {
+        if self.receiver.is_none() {
+            return;
+        }
+        print!("{}", clear::All);
+        let mut x = 1;
+        let mut y = 1;
+        for lines in self.grid_info.grid.iter().rev() {
             for case in lines {
-                if case == &GridInfo::CASE_WIN
-                {
-                    print!("{}{}{}", cursor::Goto(x, y), color::Fg(color::Green), "A");
-                }
-                else if case == &GridInfo::CASE_CLOSE
-                {
+                if case == &GridInfo::CASE_WIN {
+                    print!("{}{}A", cursor::Goto(x, y), color::Fg(color::Green));
+                } else if case == &GridInfo::CASE_CLOSE {
                     print!("{}{}{}", cursor::Goto(x, y), color::Fg(color::Red), case);
-                }
-                else {
-                    print!("{}{}{}", cursor::Goto(x, y), color::Fg(color::LightBlue), case);
+                } else {
+                    print!(
+                        "{}{}{}",
+                        cursor::Goto(x, y),
+                        color::Fg(color::LightBlue),
+                        case
+                    );
                 }
                 std::io::stdout().flush().unwrap();
                 x += 1;
@@ -34,31 +36,39 @@ impl DisplayGrid {
             x = 1;
             y += 1;
         }
-        let mut start_x = (self.grid_info.start_pos.1 as u16) + 1;
-        let mut start_y = (self.grid_info.row_max as u16) - (self.grid_info.start_pos.0 as u16) + 1;
-        print!("{}{}{}", cursor::Goto(start_x, start_y), color::Fg(color::Green), "B");
+        let start_x = (self.grid_info.start_pos.1 as u16) + 1;
+        let start_y = (self.grid_info.row_max as u16) - (self.grid_info.start_pos.0 as u16) + 1;
+        print!(
+            "{}{}B",
+            cursor::Goto(start_x, start_y),
+            color::Fg(color::Green)
+        );
         print!("\n\n\n{}", cursor::Save);
 
         loop {
-            
-            if let Ok(case) = self.receiver.recv()
-            {
-                let mut new_x = case.1 as u16 + 1;
-                let mut new_y = case.0 as u16;
+            if let Some(receiver) = &self.receiver {
+                if let Ok(case) = receiver.recv() {
+                    let new_x = case.1 as u16 + 1;
+                    let mut new_y = case.0 as u16;
 
-                if case == self.grid_info.start_pos
-                {
-                    print!("{}", cursor::Restore);
-                    print!("{}", color::Fg(color::Reset));
-                    print!("{}", cursor::Show);
-                    std::io::stdout().flush().unwrap();
-                    break;
+                    if case == self.grid_info.start_pos {
+                        print!("{}", cursor::Restore);
+                        print!("{}", color::Fg(color::Reset));
+                        print!("{}", cursor::Show);
+                        std::io::stdout().flush().unwrap();
+                        break;
+                    }
+                    new_y = (self.grid_info.row_max as u16) - new_y + 1;
+                    print!(
+                        "{}{}{}@",
+                        cursor::Goto(new_x, new_y),
+                        color::Fg(color::Yellow),
+                        cursor::Hide
+                    );
+                    std::thread::sleep(Duration::from_millis(100));
                 }
-                new_y = (self.grid_info.row_max as u16) - new_y + 1;
-                print!("{}{}{}{}", cursor::Goto(new_x, new_y), color::Fg(color::Yellow), cursor::Hide, "@");
-                std::thread::sleep(Duration::from_millis(500));
+                std::io::stdout().flush().unwrap();
             }
-            std::io::stdout().flush().unwrap();
         }
     }
 }

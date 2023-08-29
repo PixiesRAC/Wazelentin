@@ -26,16 +26,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         Ok(grid_info) =>
         {
-            let (sender, receiver) : (mpsc::Sender<(usize, usize)>, mpsc::Receiver<(usize, usize)>)= mpsc::channel();
-
+            let (sender, receiver) = mpsc::channel::<(usize, usize)>();
             let grid_info_copy_for_display = grid_info.clone();
 
-            let display = DisplayGrid{grid_info : grid_info_copy_for_display, receiver : receiver};
+            let display = DisplayGrid{grid_info : grid_info_copy_for_display, receiver : Some(receiver)};
             let handle = thread::spawn(move || {
-                let (sender, receiver) : (mpsc::Sender<(usize, usize)>, mpsc::Receiver<(usize, usize)>)= mpsc::channel();
                     display.display_grid();
                 });
-            let wazelentin = PathDetective{grid_info : grid_info, sender : sender};
+            let wazelentin = PathDetective{grid_info, sender : Some(sender)}; 
+            // IN fact the sender is only for the display, if i don't want to display anything i don't want to add a sender, change it ! -> OPTION !!!
             wazelentin.find_and_transmit_shortest_path();
             handle.join().unwrap();
 

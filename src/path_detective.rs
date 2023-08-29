@@ -6,7 +6,7 @@ use std::sync::mpsc;
 
 pub struct PathDetective {
     pub grid_info: GridInfo,
-    pub sender : mpsc::Sender<(usize, usize)>
+    pub sender : Option<mpsc::Sender<(usize, usize)>>
 }
 
 #[derive(Clone, Debug)]
@@ -150,7 +150,10 @@ impl PathDetective {
                     }
                 }
             }
-            self.sender.send(next_case_to_check.0.clone()).unwrap();
+            if let Some(sender) = &self.sender
+            {
+                sender.send(next_case_to_check.0).unwrap();
+            }
             //print!("{:?}", next_case_to_check.0);
             shortest_path.insert(0, next_case_to_check.0);
             self.find_best_intersection(&graph.clone(), visited, &next_case_to_check.0, shortest_path);
@@ -187,7 +190,8 @@ mod tests {
             .to_vec(),
         };
         let wazelentin = PathDetective {
-            grid_info: grid_info
+            grid_info: grid_info,
+            sender: None
         };
         let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
 
@@ -210,7 +214,8 @@ mod tests {
         };
         grid_info.grid.reverse();
         let wazelentin = PathDetective {
-            grid_info: grid_info
+            grid_info: grid_info,
+            sender: None
         };
         let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
 
@@ -238,8 +243,9 @@ mod tests {
         };
         grid_info.grid.reverse();
         let wazelentin = PathDetective {
-            grid_info: grid_info
+            grid_info: grid_info,
+            sender: None
         };
-        assert_eq!(wazelentin.find_shortest_path(), [(2, 6), (3, 6), (4, 5), (3, 4), (2, 3), (1, 2), (1, 1), (0, 0)]);
+        assert_eq!(wazelentin.find_and_transmit_shortest_path(), [(2, 6), (3, 6), (4, 5), (3, 4), (2, 3), (1, 2), (1, 1), (0, 0)]);
     }
 }
