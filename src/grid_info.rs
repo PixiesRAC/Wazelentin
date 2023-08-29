@@ -2,6 +2,7 @@ use std::vec;
 
 use grid::Error;
 
+#[derive(Clone)]
 pub struct GridInfo {
     pub start_pos: (usize, usize),
     pub exit_pos: (usize, usize),
@@ -29,15 +30,8 @@ impl GridInfo {
     pub const CASE_CLOSE: char = 'E';
     pub const CASE_WIN: char = 'X';
 
-    // the goal here is to seperate the error logic and the functionnal logic
-    // I don't want to have these both logic inside one function
-    // When i am on the 'new' function or anything others 'functionnal' function i want to have peace of mind 
-    // More than that it's realy helpfull when you have to focus something which is only functionnal, the risk of doing some bugs is reduce seeing that the code is separated
-    // The hard thing here is to be capable of reducing the amount of duplicate code (TODO)
-    
-    fn check_integrity(grid_row : &String) -> Result<(), Error>
-    {
-      let mut grid_lines = grid_row.lines();
+    fn check_integrity(grid_row: &str) -> Result<(), Error> {
+        let mut grid_lines = grid_row.lines();
         if let Some(row_and_column_max_line) = grid_lines.next() {
             let field_iterator: Vec<_> = row_and_column_max_line.split(' ').collect();
             if field_iterator.len() == 2 {
@@ -71,14 +65,16 @@ impl GridInfo {
         if self.start_pos.0 > self.row_max || self.column_max < self.start_pos.1  {
             return Err(Error::IncoherenceBetweenStartPosAndMaxBound);
         }
-        let mut row: usize = 0;
+        let mut row: usize = self.row_max;
+        let mut count_grid_line = 0;
         #[allow(unused_assignments)]
         let mut column: usize = 0;
         let mut nb_exit = 0;
         for line in lines {
             column = 0;
             for c in line.chars() {
-                if (row, column) == self.start_pos && c != GridInfo::CASE_OPEN {
+                println!("{:?}{}", (row, column), c);
+               if ((row, column) == self.start_pos) && c != GridInfo::CASE_OPEN {
                         return Err(Error::StartPosOnBlockedCase);
                     }
                 if c != GridInfo::CASE_WIN && c != GridInfo::CASE_OPEN && c != GridInfo::CASE_CLOSE
@@ -93,9 +89,10 @@ impl GridInfo {
             {
                 return Err(Error::IncoherenceGridSize);
             }
-            row += 1
+            count_grid_line += 1;
+            row = row.saturating_sub(1);
         }
-        if (row - 1) != self.row_max {
+        if (count_grid_line - 1) != self.row_max {
             return Err(Error::IncoherenceGridSize);
         }
         if nb_exit == 0 {
@@ -118,10 +115,7 @@ impl GridInfo {
                 }
                 current_pos.1 += 1;
             }
-            if current_pos.0 > 0 {
-                // TO DO
-                current_pos.0 -= 1;
-            }
+            current_pos.0 = current_pos.0.saturating_sub(1);
             current_pos.1 = 0;
             self.grid.insert(0, grid_line);
         }
@@ -187,7 +181,7 @@ mod tests {
     }
     #[test]
     fn test_should_return_error_for_start_position_if_start_sport_start_on_wrong_case() {
-        let test_input_grid_row = &String::from("2 6\n0 2\nEXEEEEE\nOOOOOEE\nEOOEEEE");
+        let test_input_grid_row = &String::from("2 6\n0 2\nEXEEEEE\nOOOOOEE\nEOEEEEE");
         if let Err(grid_error) = GridInfo::new(test_input_grid_row) {
             assert_eq!(Error::StartPosOnBlockedCase, grid_error);
         } else {
@@ -277,7 +271,7 @@ mod tests {
     }
     #[test]
     fn test_should_return_incoherence_error_for_grid_which_does_not_respect_bound() {
-        let test_input_grid_row = &String::from("6 2\n6 2\nXOEEEE\nOOOEE\nEOOEEEE");
+        let test_input_grid_row = &String::from("6 2\n6 2\nXOOEEE\nOOOEE\nEOOEEEE");
         if let Err(grid_error) = GridInfo::new(test_input_grid_row) {
             assert_eq!(Error::IncoherenceGridSize, grid_error);
         } else {

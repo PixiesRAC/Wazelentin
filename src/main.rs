@@ -1,9 +1,14 @@
-use clap::Parser;
 mod grid_info;
 mod path_detective;
+mod grid_display;
+
+use std::thread;
+use clap::Parser;
+use std::sync::mpsc;
 
 use grid_info::GridInfo;
 use path_detective::PathDetective;
+use grid_display::DisplayGrid;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -21,8 +26,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         Ok(grid_info) =>
         {
-            let wazelentin = PathDetective{grid_info};
-            wazelentin.find_shortest_path();
+            let (sender, receiver) = mpsc::channel::<(usize, usize)>();
+            let grid_info_copy_for_display = grid_info.clone();
+
+            let display = DisplayGrid{grid_info : grid_info_copy_for_display, receiver : Some(receiver)};
+            let handle = thread::spawn(move || {
+                    display.display_grid();
+                });
+            let wazelentin = PathDetective{grid_info, sender : Some(sender)}; 
+            // IN fact the sender is only for the display, if i don't want to display anything i don't want to add a sender, change it ! -> OPTION !!!
+            wazelentin.find_and_transmit_shortest_path();
+            handle.join().unwrap();
+
         }
         Err(err) =>
         {
