@@ -48,6 +48,11 @@ impl DisplayGrid {
         loop {
             if let Some(receiver) = &self.receiver {
                 if let Ok(case) = receiver.recv() {
+                    if case == (usize::MAX, usize::MAX)
+                    {
+                        return;
+                    }
+                    
                     let new_x = case.1 as u16 + 1;
                     let mut new_y = case.0 as u16;
 

@@ -123,15 +123,10 @@ impl PathDetective {
     }
 
     #[allow(unused_must_use)]
-    fn find_best_intersection(
-        &self,
-        graph: &HashMap<(usize, usize), Rc<RefCell<GraphInfo>>>,
-        visited: &mut HashSet<(usize, usize)>,
-        pos: &(usize, usize),
-        shortest_path: &mut Vec<(usize, usize)>) {
+    fn find_best_intersection (&self, graph: &HashMap<(usize, usize), Rc<RefCell<GraphInfo>>>, visited: &mut HashSet<(usize, usize)>, pos: &(usize, usize),
+        shortest_path: &mut Vec<(usize, usize)>) -> bool {
         if pos != &self.grid_info.start_pos {
-            //println!("{:?}", pos);
-            let rc_graph_info = graph.get(pos).expect("Position not found in graph_cases");
+            let rc_graph_info = graph.get(pos).unwrap();  //.expect("Position not found in graph_cases");
             let graph_info = rc_graph_info.borrow();
 
             let mut next_case_to_check = ((usize::MAX, usize::MAX), usize::MAX);
@@ -156,19 +151,30 @@ impl PathDetective {
             }
             //print!("{:?}", next_case_to_check.0);
             shortest_path.insert(0, next_case_to_check.0);
-            self.find_best_intersection(&graph.clone(), visited, &next_case_to_check.0, shortest_path);
+            if next_case_to_check.0 == (usize::MAX, usize::MAX)
+            {
+                return false;
+            }
+            else {
+                self.find_best_intersection(&graph.clone(), visited, &next_case_to_check.0, shortest_path);
+            }
         }
+        true
     }
 
-    pub fn find_and_transmit_shortest_path(&self) -> Vec<(usize, usize)> {
+    pub fn find_and_transmit_shortest_path(&self) -> Option<Vec<(usize, usize)>> {
         let mut shortest_path = Vec::new();
         let mut graph_cases: HashMap<(usize, usize), Rc<RefCell<GraphInfo>>> = HashMap::new();
         self.fill_graph(&mut graph_cases);
         let mut visited: std::collections::HashSet<(usize, usize)> =
             std::collections::HashSet::new();
         shortest_path.push(self.grid_info.exit_pos);
-        self.find_best_intersection(&graph_cases.clone(), &mut visited, &self.grid_info.exit_pos, &mut shortest_path);
-        shortest_path
+        if self.find_best_intersection(&graph_cases.clone(), &mut visited, &self.grid_info.exit_pos, &mut shortest_path)
+        {
+            return Some(shortest_path);
+        }
+        eprintln!("There is no available way for the exit case");
+        None
     }
 }
 
@@ -246,6 +252,31 @@ mod tests {
             grid_info: grid_info,
             sender: None
         };
-        assert_eq!(wazelentin.find_and_transmit_shortest_path(), [(2, 6), (3, 6), (4, 5), (3, 4), (2, 3), (1, 2), (1, 1), (0, 0)]);
+        assert_eq!(wazelentin.find_and_transmit_shortest_path().unwrap(), [(2, 6), (3, 6), (4, 5), (3, 4), (2, 3), (1, 2), (1, 1), (0, 0)]);
+    }
+
+    #[test]
+    fn test_should_return_error_message_if_exit_case_is_unreachable() {
+        let mut grid_info = GridInfo {
+            start_pos: (2, 6),
+            exit_pos: (0, 0),
+            row_max: 5,
+            column_max: 6,
+            grid: [
+                ['E', 'O', 'E', 'O', 'E', 'O', 'E'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'O', 'O'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'E', 'O'].to_vec(),
+                ['O', 'O', 'O', 'O', 'O', 'E', 'O'].to_vec(),
+                ['E', 'E', 'E', 'E', 'E', 'E', 'E'].to_vec(),
+                ['X', 'O', 'O', 'E', 'E', 'O', 'O'].to_vec(),
+            ]
+            .to_vec(),
+        };
+        grid_info.grid.reverse();
+        let wazelentin = PathDetective {
+            grid_info: grid_info,
+            sender: None
+        };
+        assert_eq!(true, wazelentin.find_and_transmit_shortest_path().is_none());
     }
 }
